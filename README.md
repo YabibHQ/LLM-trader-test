@@ -189,6 +189,8 @@ docker run --rm -it \
 
 Then open <http://localhost:8501> to access the UI.
 
+streamlit run dashboard.py --server.port=8501 --server.address=0.0.0.0
+
 The top-level metrics include Sharpe and Sortino ratios alongside balance, equity, and PnL so you can quickly assess both realised returns and downside-adjusted performance.
 
 ---
