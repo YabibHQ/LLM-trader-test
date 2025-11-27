@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 DeepSeek Multi-Asset Paper Trading Bot
-Uses Binance API for market data and OpenRouter API for DeepSeek Chat V3.1 trading decisions
+Uses Binance API for market data and DeepSeek API for Chat V3.1 trading decisions
 """
 from __future__ import annotations
 
@@ -105,7 +105,7 @@ def _parse_thinking_env(value: Optional[str]) -> Optional[Any]:
 # ───────────────────────── CONFIG ─────────────────────────
 API_KEY = os.getenv("BN_API_KEY", "")
 API_SECRET = os.getenv("BN_SECRET", "")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENROUTER_API_KEY", "")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_SIGNALS_CHAT_ID = os.getenv("TELEGRAM_SIGNALS_CHAT_ID", "")
@@ -264,7 +264,7 @@ def _load_trade_interval(default: str = DEFAULT_INTERVAL) -> str:
 INTERVAL = _load_trade_interval()
 CHECK_INTERVAL = _INTERVAL_TO_SECONDS[INTERVAL]
 DEFAULT_RISK_FREE_RATE = 0.0  # Annualized baseline for Sortino ratio calculations
-DEFAULT_LLM_MODEL = "deepseek/deepseek-chat-v3.1"
+DEFAULT_LLM_MODEL = "deepseek-chat"
 
 
 def _load_llm_model_name() -> str:
@@ -354,19 +354,19 @@ RISK_FREE_RATE = _resolve_risk_free_rate()
 if not dotenv_loaded:
     logging.warning(f"No .env file found at {DOTENV_PATH}; falling back to system environment variables.")
 
-if OPENROUTER_API_KEY:
+if DEEPSEEK_API_KEY:
     masked_key = (
-        OPENROUTER_API_KEY
-        if len(OPENROUTER_API_KEY) <= 12
-        else f"{OPENROUTER_API_KEY[:6]}...{OPENROUTER_API_KEY[-4:]}"
+        DEEPSEEK_API_KEY
+        if len(DEEPSEEK_API_KEY) <= 12
+        else f"{DEEPSEEK_API_KEY[:6]}...{DEEPSEEK_API_KEY[-4:]}"
     )
     logging.info(
-        "OpenRouter API key detected: %s (length %d)",
+        "DeepSeek API key detected: %s (length %d)",
         masked_key,
-        len(OPENROUTER_API_KEY),
+        len(DEEPSEEK_API_KEY),
     )
 else:
-    logging.error("OPENROUTER_API_KEY not found; please check your .env file.")
+    logging.error("DEEPSEEK_API_KEY not found; please check your .env file.")
 
 client: Optional[Client] = None
 
@@ -1497,7 +1497,7 @@ def _recover_partial_decisions(json_str: str) -> Optional[Tuple[Dict[str, Any], 
 
 
 def call_deepseek_api(prompt: str) -> Optional[Dict[str, Any]]:
-    """Call OpenRouter API with DeepSeek Chat V3.1."""
+    """Call DeepSeek API directly for Chat V3.1."""
     try:
         request_metadata: Dict[str, Any] = {
             "model": LLM_MODEL_NAME,
@@ -1539,12 +1539,10 @@ def call_deepseek_api(prompt: str) -> Optional[Dict[str, Any]]:
             request_payload["thinking"] = LLM_THINKING_PARAM
 
         response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
+            url="https://api.deepseek.com/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/crypto-trading-bot",
-                "X-Title": "DeepSeek Trading Bot",
             },
             json=request_payload,
             timeout=30
@@ -1552,7 +1550,7 @@ def call_deepseek_api(prompt: str) -> Optional[Dict[str, Any]]:
 
         if response.status_code != 200:
             notify_error(
-                f"OpenRouter API error: {response.status_code}",
+                f"DeepSeek API error: {response.status_code}",
                 metadata={
                     "status_code": response.status_code,
                     "response_text": response.text,
@@ -2413,8 +2411,8 @@ def main() -> None:
     load_equity_history()
     load_state()
     
-    if not OPENROUTER_API_KEY:
-        logging.error("OPENROUTER_API_KEY not found in .env file")
+    if not DEEPSEEK_API_KEY:
+        logging.error("DEEPSEEK_API_KEY not found in .env file")
         return
     
     logging.info(f"Starting capital: ${START_CAPITAL:.2f}")
